@@ -4,7 +4,6 @@ RUN R -e "install.packages(c('reticulate', 'shinyjs', 'h5py', 'shiny', 'shinydas
 
 RUN apt-get update && apt-get install -y python3-pip
 RUN pip3 install h5py tensorflow
-
 COPY src /src
 WORKDIR /src
 EXPOSE 3838
