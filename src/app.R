@@ -159,7 +159,7 @@ ui <- dashboardPage(
     shinyjs::useShinyjs(),
     
     # This function must be called from a Shiny app's UI in order for all other shinyalert functions to work.
-    shinyalert::useShinyalert(force = TRUE),
+    shinyalert::useShinyalert(),
     
     # This function must be called from a Shiny app's UI in order for all other waiter functions to work.
     waiter::useWaitress(),
