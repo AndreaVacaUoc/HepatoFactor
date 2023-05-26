@@ -1,0 +1,109 @@
+#
+# Aplicación predictora de las patologías: Hernia de disco y espondilolistesis:
+
+library(shiny)
+library(kernlab)
+library(rsconnect)
+library(shinythemes)
+library(shinyvalidate)
+
+#Token para enlazar la aplicación web al servidor Shiny
+rsconnect::setAccountInfo(name='damaris24', token='CB9E1B34933C36E3AB0B936EEEE6AE3B', secret='LpofyDb2Kkib8p6SLoxALqggRomfUslg1FbpR4y7')
+
+#Cargar los elementos guardados; el modelo seleccionado SVM con el kernel "vanilladot" y los datos normalizados de train
+load("data.RData")
+
+# UI
+ui <- fluidPage(theme = shinytheme("cerulean"),
+                headerPanel("PREDICTOR DE LA SALUD LUMBAR"),align="center",
+                sidebarPanel(
+                    #Configurar los cuadros donde se ingresará las nuevas medidad biomecánicas
+                    numericInput("num1", h4("Incidencia pélvica"), NULL, min = 16,max = 140), #Establecer parámetros para identificar valores válidos, min y max obtenidos de los datos utilizados 
+                    hr(),
+                    numericInput("num2", h4("Inclinación pélvica"), NULL, min = -17,max = 60),
+                    hr(),
+                    numericInput("num3", h4("Ángulo de lordosis lumbar"), NULL, min = 5,max = 136),
+                    hr(),
+                    numericInput("num4", h4("Pendiente sacra"), NULL, min = 3,max = 131),
+                    hr(),
+                    numericInput("num5", h4("Radio pélvico"), NULL, min = 60,max = 173),
+                    hr(),
+                    numericInput("num6", h4("Grando espondilolistesis"), NULL, min = -21,max = 508),
+                    
+                    #Botón para accionar la predicción del diagnóstico
+                    actionButton(inputId = "go",label = "Diagnóstico",class = "btn-success",icon = icon("bar-chart-o")),align = "center"
+                ),
+                
+                mainPanel(
+                    hr(),
+                    h4("La región lumbar de la columna vertebral está compuesta por vértebras más grandes y gruesas, debido a que en esta zona se deposita la mayor parte del peso del cuerpo, lo que hace que sea más propensa a la aparición de dolores y afecciones. El dolor en la región lumbar es una de las principales causas de consulta médica y se presenta con frecuencia en el 80-90% de la población adulta. La hernia de disco y la espondilolistesis son patologías degenerativas que afectan generalmente a la columna lumbar, siendo algunas de las posibles causas del dolor esta zona."),
+                    hr(),
+                    h4("Esta aplicación ha sido desarrollada con el objetivo de optimizar el diagnóstico tanto de hernia de disco como de espondilolistesis, interpretando rápidamente las características biomecánicas de los pacientes y orientando a los médicos para aplicar un tratamiento oportuno. Se desarrolló a partir de la base de datos “column_3C_weka” disponible en UCI Machine Learning Repository, entrenando un modelo predictivo con el algoritmo de aprendizaje automático SVM (máquina de soporte de vectores) y alcanza una precisión del 85%."),
+                    hr(),
+                    h1(span("Diagnóstico:",style = "color:limegreen"),align="center"),
+                    h2(textOutput('dx'),align="center"),
+                    hr()
+                ),
+                mainPanel(
+                    img(src='Normal.jpeg'),
+                    img(src='Hernia.jpeg'),
+                    img(src='Espondilolistesi.jpeg'),
+                    align="center"),
+                mainPanel(
+                    hr(),
+                    h4("La hernia de disco consiste en la salida del material gelatinoso contenido en el disco intervertebral hacia el canal raquídeo. Mientras que la espondilolistesis es el desplazamiento de una vértebra, por lo general hacia adelante, de la vértebra que se encuentra debajo. Ambas patologías generan dolor a causa de la compresión de las raíces nerviosas.")
+                )
+)
+
+# SERVER
+server <- function(input, output,session) {
+    #Validar que la información ingresada cumpla con los parámetros establecidos
+    iv <- InputValidator$new()
+    
+    #Establecer las reglas de validación
+    iv$add_rule("num1", sv_required(message = "valor requerido"))
+    iv$add_rule("num1", sv_between(16, 140, message_fmt = "Valores permitidos entre {left} y {right}."))
+    iv$add_rule("num2", sv_required(message = "valor requerido"))
+    iv$add_rule("num2", sv_between(-17, 60, message_fmt = "Valores permitidos entre {left} y {right}."))
+    iv$add_rule("num3", sv_required(message = "valor requerido"))
+    iv$add_rule("num3", sv_between(5, 136, message_fmt = "Valores permitidos entre {left} y {right}."))
+    iv$add_rule("num4", sv_required(message = "valor requerido"))
+    iv$add_rule("num4", sv_between(3, 131, message_fmt = "Valores permitidos entre {left} y {right}."))
+    iv$add_rule("num5", sv_required(message = "valor requerido"))
+    iv$add_rule("num5", sv_between(60, 173, message_fmt = "Valores permitidos entre {left} y {right}."))
+    iv$add_rule("num6", sv_required(message = "valor requerido"))
+    iv$add_rule("num6", sv_between(-21, 508, message_fmt = "Valores permitidos entre {left} y {right}."))
+
+    iv$enable()
+    
+    #Guardamos valores reactivos
+    v<-reactiveValues()
+    
+    observeEvent(input$go,{
+        if (iv$is_valid()) {
+        v$IP<-(input$num1 - 57.14)/15.46
+        v$TP<-(input$num2 - 17.4)/9.22
+        v$AL<-(input$num3 - 47.79)/17
+        v$PS<-(input$num4 - 39.74)/11.3
+        v$RP<-(input$num5 - 119.51)/11.79
+        v$GS<-(input$num6 - 19.57)/31.4
+        v$newdata<- cbind(v$IP,v$TP,v$AL,v$PS,v$RP,v$GS)
+        v$pred_app<-predict(svm_model_mej,v$newdata)
+        v$pred_app<-as.character(v$pred_app)
+        
+        } else{ #En caso de no cumplir con los parámetros establecidos mostrar mensaje de alerta
+            showNotification(
+                "Por favor ingrese medidas biomecánicas válidas",
+                type = "warning")
+        }
+        
+    })
+    
+    #Mostrar resultado
+    output$dx<- renderText(
+        v$pred_app
+    )
+}
+
+# CORRER APP
+shinyApp(ui = ui, server = server)

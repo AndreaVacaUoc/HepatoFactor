@@ -1,0 +1,7 @@
+"0","# Tabla resumen del rendimiento de los diferentes modelos:"
+"0","stats_models <- rbind(stats_class_sfg)"
+"0",""
+"0","# Ordenamos la tabla por la precisión y lo guardamos"
+"0","stats_models_prec <- stats_models %>% arrange(desc(precision))"
+"0",""
+"0","knitr::kable(stats_models_prec, digits = 3, caption = ""Métricas del rendimiento de los modelos de aprendizaje automático."")"

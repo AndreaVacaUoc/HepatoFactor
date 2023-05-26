@@ -1,0 +1,268 @@
+---
+title: "sobreajuste"
+author: "Andrea Vaca"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  html_document:
+    code_folding: show
+    toc: yes
+    toc_float:
+      toc_collapsed: yes
+    toc_depth: 4
+    theme: flatly
+    highlight: textmate
+    number_sections: yes
+editor:
+  markdown:
+    wrap: 72
+self_contained: yes
+header-includes:
+- \usepackage{float}
+- \floatplacement{figure}{H}
+- \usepackage[spanish]{babel}
+editor_options: 
+  chunk_output_type: inline
+params:
+  folder.data: "./data"
+  myfile: "HCV4.RData"
+  ind.train: 0.7
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NULL,
+                      warning = FALSE, message = FALSE, 
+                      fig.align="center", cache = TRUE)
+```
+
+```{r paquetes, include=FALSE}
+# Cargamos los paquetes
+library(knitr)
+ library(caret)
+ library(class)
+ library(e1071)
+ library(neuralnet)
+ library(NeuralNetTools)
+ library(kernlab)
+ library(randomForest)
+ library(psych)
+ library(ggplot2)
+ library(gridExtra)
+ library(ggpubr)
+ library(dplyr)
+ library(bookdown)
+ library(prettydoc)
+ library(corrplot)
+ library(ggcorrplot)
+ library(GGally)
+ library(randomForestSRC)
+ library(tibble)
+ library(recipes)
+ library(tidyr)
+ library(outliers)
+ library(RSNNS)
+ library(ranger)
+ library(lattice)
+library(keras)
+library(mlr)
+library(tensorflow)
+```
+
+\newpage
+
+```{r Import_data1}
+# Cargamos los datos
+set.seed(2312)
+
+m.file <- file.path(params$folder.data, params$myfile)
+load(m.file)
+head(HCV4)
+```
+
+### Preprocesamiento de datos
+
+Creamos una función para normalizar los datos en base a mínimos y máximos para que tengan valores entre 0 y 1 y poder observar todos los datos a la misma escala.
+
+```{r, echo=FALSE}
+
+#Función
+normalizar <- function(x) {
+return((x -min(x)) / (max(x) -min(x)))
+}
+
+```
+
+***Partición de datos training y test***
+
+```{r train.test}
+# Particion de los datos train/test
+
+## Muestras que pertenecen al conjunto train
+set.seed(77)
+n_train <- createDataPartition(HCV4$BH.staging, p = 0.7, list = FALSE)
+
+## Eliminamos las variables con menos importancia
+#set.seed(77)
+HCV2<- HCV4
+
+HCV2 <- HCV2 %>% 
+         select(-Epigastria.pain, -Gender, -Headache, -Nausea.Vomiting, -Jaundice, -Fatigue.Boneache, -Fever, -Diarrhea, -RNA.12, -RNA.EOT, -RNA.EF, -HGB, -BH.grading, -BMI, -ALT.after.24.w, -Age, -ALT.36, -ALT.12)
+
+
+
+
+## Creamos los conjuntos train y test:
+train.d <- HCV2[n_train,]
+test.d <- HCV2[-n_train,]
+
+
+## Variable objetivo por conjunto de datos
+label_train <- HCV2[n_train,length(HCV2)]
+label_test <- HCV2[-n_train,length(HCV2)]
+```
+
+***Preparación de datos***
+
+```{r}
+# Preparamos los conjuntos de datos para que sean preprocesados
+
+# Creamos un respaldo de los datos de prueba y entrenamiento
+data_train <- train.d
+data_test  <- test.d
+
+save(data_train, file = file.path(params$folder.data,"data_train.RData"))
+
+save(data_test, file = file.path(params$folder.data,"data_test.RData"))
+
+data_tn <- data_train
+data_tt <- data_test
+
+# Normalizamos los datos de prueba y entrenamiento
+
+
+data_tn2 <- data_tn %>% 
+  mutate_if(is.numeric, normalizar)
+  
+data_tt2 <- data_tt %>% 
+  mutate_if(is.numeric, normalizar)
+```
+
+
+
+## Modelo de Sequential Feature Generator (SFG)
+
+```{r}
+library(keras)
+library(mlr)
+library(tensorflow)
+
+# Crear variables one-hot para la variable de salida
+data_tn2$BH.staging.1 <- as.integer(data_tn2$BH.staging == "F1")
+data_tn2$BH.staging.2 <- as.integer(data_tn2$BH.staging == "F2")
+data_tn2$BH.staging.3 <- as.integer(data_tn2$BH.staging == "F3")
+data_tn2$BH.staging.4 <- as.integer(data_tn2$BH.staging == "F4")
+
+data_tn2 <- data_tn2 %>% 
+  select(-BH.staging)
+
+# Convertir a matriz y variables one-hot
+set.seed(161121)
+nc <- ncol(data_tn2)
+x_train <- as.matrix(data_tn2[, 1:nc])
+y_train <- as.matrix(data_tn2[, c("BH.staging.1", "BH.staging.2", "BH.staging.3", "BH.staging.4")])
+
+tf$random$set_seed(777)
+# Crear modelo secuencial
+modelo_sfg <- keras_model_sequential() %>%
+  layer_dense(units = 32, activation = "relu", input_shape = c(nc)) %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 16, activation = "relu") %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 4, activation = "softmax")
+
+# Compilar modelo
+#learning_rate <- c(0.001, 0.01, 0.1)
+
+learning_rate <- 0.0001
+
+tf$random$set_seed(777)
+modelo_sfg %>% compile(
+  optimizer = optimizer_adam(learning_rate),
+  loss = "categorical_crossentropy",
+  metrics = "accuracy"
+)
+
+#tf$random$set_seed(777)
+  # Entrenar el modelo
+history <- modelo_sfg %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 47,
+  batch_size = 32,
+  validation_split = 0.2,
+  verbose = 0
+)
+
+plot(history)
+
+save_model_hdf5(modelo_sfg, "modelo_sfg.h5")
+```
+
+```{r, cache=TRUE}
+
+# Crear variables one-hot para la variable de salida
+data_tt2$BH.staging.1 <- as.integer(data_tt2$BH.staging == "F1")
+data_tt2$BH.staging.2 <- as.integer(data_tt2$BH.staging == "F2")
+data_tt2$BH.staging.3 <- as.integer(data_tt2$BH.staging == "F3")
+data_tt2$BH.staging.4 <- as.integer(data_tt2$BH.staging == "F4")
+
+data_tt2 <- data_tt2 %>% 
+  select(-BH.staging)
+
+
+set.seed(161222)
+x_test <- as.matrix(data_tt2[, 1:nc])
+
+
+set.seed(161222)
+predicciones_sfg_prob <- predict(modelo_sfg, x_test)
+predicciones_sfg <- max.col(predicciones_sfg_prob)
+
+# Convertir predicciones a valores originales de BH.staging
+predicciones_sfg <- factor(ifelse(predicciones_sfg == 1, "F1",
+                                  ifelse(predicciones_sfg == 2, "F2",
+                                         ifelse(predicciones_sfg == 3, "F3", "F4"))),
+                           levels = c("F1", "F2", "F3", "F4"))
+set.seed(161222)
+conf_mat_sfg <- caret::confusionMatrix(predicciones_sfg, factor(data_test$BH.staging, levels = c("F1", "F2", "F3", "F4")))
+conf_mat_sfg
+
+
+```
+
+```{r}
+stats_class_sfg <- data.frame(model = "SFG",
+                              precision = conf_mat_sfg$overall["Accuracy"],
+                              FN = conf_mat_sfg$table[2,1],
+                              FP = conf_mat_sfg$table[1,2],
+                              error.rate = 1 - conf_mat_sfg$overall["Accuracy"],
+                              kappa = conf_mat_sfg$overall["Kappa"],
+                              sensibilidad = mean(conf_mat_sfg$byClass[, "Sensitivity"]),
+                              especificidad = mean(conf_mat_sfg$byClass[, "Specificity"]),
+                              precisión = mean(conf_mat_sfg$byClass[, "Pos Pred Value"]),
+                              recuperación = mean(conf_mat_sfg$byClass[, "Recall"]),
+                              f.medida = mean(conf_mat_sfg$byClass[, "F1"])
+)
+stats_class_sfg
+```
+
+```{r, echo=FALSE}
+# Tabla resumen del rendimiento de los diferentes modelos:
+stats_models <- rbind(stats_class_sfg)
+
+# Ordenamos la tabla por la precisión y lo guardamos
+stats_models_prec <- stats_models %>% arrange(desc(precision))
+
+knitr::kable(stats_models_prec, digits = 3, caption = "Métricas del rendimiento de los modelos de aprendizaje automático.")
+
+
+```

@@ -1,0 +1,6 @@
+"0","# Cargamos los datos"
+"0","set.seed(2312)"
+"0",""
+"0","m.file <- file.path(params$folder.data, params$myfile)"
+"0","load(m.file)"
+"0","head(HCV4)"

@@ -1,0 +1,6 @@
+"0",""
+"0","#Función"
+"0","normalizar <- function(x) {"
+"0","return((x -min(x)) / (max(x) -min(x)))"
+"0","}"
+"0",""
