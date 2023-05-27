@@ -23,16 +23,26 @@ library(tensorflow)
 #setwd("D:/DRIVE UNIVERSIDAD/UOC/Sem4/Revisión/HepatoFactor")
 
 # Data and machine learning model
-modelo_sfg_recipe <- keras::load_model_hdf5("data/modelo_sfg_recipe.h5")
+modelo_sfg <- keras::load_model_hdf5("data/modelo_sfg.h5")
 
 
 #Datos
-load("data/model_data.RData")
+load("data/datos.RData")
 
 
 # Load R scripts:
 source("scripts/script_graficos_web.R")
 
+#Function normalized
+normalizar <- function(data, min_vals, max_vals) {
+  normalized_data <- data  # Crear una copia del data frame original
+  
+  for (col in colnames(data)) {
+    normalized_data[[col]] <- (data[[col]] - min_vals[[col]]) / (max_vals[[col]] - min_vals[[col]])
+  }
+  
+  return(normalized_data)
+}
 
 # Required variables to make a prediction:
 variables <- c("Id","Age","Gender","WBC", "RBC", "Plat", "AST.1", "ALT.1", "RNA.Base")
@@ -929,10 +939,13 @@ server <- function(input, output) {
     req(storageData$data)
     
     # Data preprocesing
-    data_trained <- bake(trained_recipe, new_data = storageData$data)
+    datos_procesados <- storageData$data[, c("WBC", "RBC", "Plat", "AST.1", "ALT.1", "RNA.Base")]
     
+    datos_normalizados <- normalizar(datos_procesados, min_val, max_val)
+    
+    x_test <- as.matrix(datos_normalizados[, 1:6])
     # Prediction/s
-    predicciones_sfg_prob <- predict(modelo_sfg_recipe, newdata = data_trained, type = "raw")
+    predicciones_sfg_prob <- predict(modelo_sfg, x_test)
     
     predicciones_sfg <- max.col(predicciones_sfg_prob)
     
@@ -942,7 +955,7 @@ server <- function(input, output) {
                                              ifelse(predicciones_sfg == 3, "F3", "F4"))),
                                levels = c("F1", "F2", "F3", "F4"))
     predicciones_sfg
-    
+
   })
   
   # Dataframe with data and predictions
