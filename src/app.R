@@ -7,7 +7,7 @@
 # Load packages
 library(shiny)
 library(shinydashboard)
-#library(shinyjs) # we use shinyjs:: in the code
+library(shinyjs) # we use shinyjs:: in the code
 library(shinyFeedback)
 library(shinyalert)
 library(caret)
