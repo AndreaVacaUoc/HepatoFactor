@@ -1,0 +1,1946 @@
+---
+title: 'Desarrollo de aplicación web para diagnóstico no invasivo de fibrosis hepática utilizando técnicas de aprendizaje automático'
+subtitle: 'Resultados Parciales. Trabajo Final del Máster'
+author: "Andrea Vaca"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  html_document:
+    code_folding: show
+    toc: yes
+    toc_float:
+      toc_collapsed: yes
+    toc_depth: 4
+    theme: flatly
+    highlight: textmate
+    number_sections: yes
+editor:
+  markdown:
+    wrap: 72
+self_contained: yes
+header-includes:
+- \usepackage{float}
+- \floatplacement{figure}{H}
+- \usepackage[spanish]{babel}
+editor_options: 
+  chunk_output_type: inline
+params:
+  folder.data: "./data"
+  myfile: "HCV-Egy-Data.csv"
+  ind.train: 0.7
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NULL,
+                      warning = FALSE, message = FALSE, 
+                      fig.align="center", cache = TRUE)
+```
+
+```{r paquetes, include=FALSE}
+# Cargamos los paquetes
+library(knitr)
+ library(caret)
+ library(class)
+ library(e1071)
+ library(neuralnet)
+ library(NeuralNetTools)
+ library(kernlab)
+ library(C50)
+ library(randomForest)
+ library(psych)
+ library(ggplot2)
+ library(gridExtra)
+ library(ggpubr)
+ library(dplyr)
+ library(bookdown)
+ library(prettydoc)
+ library(corrplot)
+ library(ggcorrplot)
+ library(GGally)
+ library(randomForestSRC)
+ library(tibble)
+ library(recipes)
+ library(tidyr)
+ library(outliers)
+ library(RSNNS)
+ library(ranger)
+ library(lattice)
+library(keras)
+```
+
+\newpage
+
+
+# Lectura, exploración de los datos y obtención de los muestras de train y test:
+
+
+## Recopilación de los datos:
+
+Los datos empleados pertenecen al “Hepatitis C Virus (HCV) for Egyptian patients” de la *UCI Machine Learning Repository* en el enlace <https://archive-beta.ics.uci.edu/dataset/503/hepatitis+c+virus+hcv+for+egyptian+patients>. En nuestro caso los datos se encuentran en el archivo `r params$myfile`. 
+
+Este conjunto de datos corresponde al análisis de varias características útiles para determinar los grados de fibrosis hepática (FH). Desde el enlace al repositorio de la UCI podemos observar una descripción de los atributos:
+
+```{r variables.yeast, echo=FALSE}
+# Fortalezas
+variables <- c("Age","Gender","BMI","Fever","Nausea/Vomiting","Headache","Diarrhea","Fatigue/Bone ache","Jaundice","Epigastria pain","WBC","RBC","HGB","Plat","AST.1","ALT.1","ALT.4","ALT.12","ALT.24","ALT.36","ALT.48","ALT.after.24.w","RNA.Base","RNA.4", "RNA.12", "RNA.EOT","RNA.EF","Baseline.histological.Grading", "Baselinehistological.staging")
+
+
+# Debilidades
+descripcion <- c("Edad del paciente",
+                 "Sexo del paciente",
+                 "Índice de masa corporal",
+                 "Fiebre",
+                 "Nausea o vómito",
+                 "Dolor de cabeza",
+                 "Diarrea",
+                 "Fatiga generalizada/Dolor de huesos",
+                 "Ictericia",
+                 "Dolor epigastrico",
+                 "Leucocitos",
+                 "Globulos rojos",
+                 "Hemoglobina",
+                 "Plaquetas",
+                 "Aspartato aminotrasferasa de 1 semana",
+                 "Alanina transaminasa de 1 semana",
+                 "Alanina transaminasa de 4 semanas",
+                 "Alanina transaminasa de 12 semanas",
+                 "Alanina transaminasa de 24 semanas",
+                 "Alanina transaminasa de 36 semanas",
+                 "Alanina transaminasa de 48 semanas",
+                 "Alanina transaminasa después de 48 semanas",
+                 "RNA Base",
+                 "RNA 4 semanas",
+                 "RNA 12 semanas",
+                 "RNA al finalizar el tratamiento",
+                 "RNA Factor de elongación",
+                 "Clasificación histológica de referencia",
+                 "Estadificación histológica")
+
+
+# Tabla de fortalezas y debilidades
+tabla_descripcion <- data.frame(variables,descripcion)
+
+
+```
+
+```{r, echo=FALSE}
+knitr::kable(tabla_descripcion, col.names = c("Variables","Descripción"), caption = "Contenido y descripción del conjunto de datos HCV-Egy-Data")
+```
+
+Tras tener una idea general que cuales son los datos del fichero `r params$myfile` procedemos a cargar, explorar y preparar los datos:
+
+```{r Import_data1}
+# Cargamos los datos
+HCV <- read.csv(file.path(params$folder.data,params$myfile), header=TRUE)
+```
+
+## Explorar y preparar los datos:
+
+Exploramos los datos y los preparamos para realizar los análisis posteriores. Primero nombramos correctamente las columnas/variables del conjunto de datos.
+
+```{r variables}
+# Nombramos correctamente las columnas del conjunto de datos
+variables <- c("Age","Gender","BMI","Fever","Nausea.Vomiting","Headache","Diarrhea","Fatigue.Boneache","Jaundice","Epigastria.pain","WBC","RBC","HGB","Plat","AST.1","ALT.1","ALT.4","ALT.12","ALT.24","ALT.36","ALT.48","ALT.after.24.w","RNA.Base","RNA.4", "RNA.12", "RNA.EOT","RNA.EF","BH.grading", "BH.staging")
+colnames(HCV) <-  variables
+```
+
+
+```{r dimensiones.NA, eval=FALSE, include=FALSE}
+# Dimensiones
+dim(HCV)
+
+# Valores NA:
+table(is.na(HCV))
+
+```
+
+El conjunto de datos HCV está formado por 29 variables con 1385 registros y no contiene valores NA, por tanto no tenemos valores faltantes. Mostramos los primeros 6 registros del conjunto HCV para familiarizarnos con los datos:
+
+```{r, echo=FALSE}
+# Primeros 6 registros
+# head(HCV)
+knitr::kable(head(HCV), align = "l",
+             caption= "Primeros 6 registros del conjunto de datos HCV.")
+```
+
+
+### Tipos de variables
+
+Comprobamos la estructura de las variables y observamos que tenemos variables categóricas y numéricas, las variables `Gender`, `Fever`, `Nausea.Vomiting`, `Headache`, `Diarrhea`, `Fatigue.Bone ache`, `Jaundice`, `Epigastria.pain`, `BH.grading`, `BH.staging` son numéricas pero deben ser categóricas, por tanto deben ser transformadas a factor ya que es el objeto de R adecuado.
+
+```{r str.HCV}
+# Estructura del conjunto de datos:
+str(HCV)
+```
+La variable `Gender` (Género) debería ser categórica con dos niveles, *Male* (Masculino), *Female* (Femenino),  por lo que tenemos que codificarla correctamente.
+
+```{r gender.factor}
+# Variable class es un factor con dos niveles:
+HCV$Gender <- factor(HCV$Gender, levels = c(1,2), labels = c("Male","Female"))
+```
+
+Transformamos las variables `Fever`, `Nausea.Vomiting`,  `Headache`, `Diarrhea`, `Fatigue.Boneache`, `Jaundice`, `Epigastria.pain`, las cuales son categóricas con dos niveles, *Absent* (Ausente), *Present* (Presente).
+
+```{r symptoms.factor}
+# Variable class es un factor con dos niveles:
+HCV$Fever <- factor(HCV$Fever, levels = c(1,2), labels = c("Absent","Present"))
+HCV$Nausea.Vomiting <- factor(HCV$Nausea.Vomiting, levels = c(1,2), labels = c("Absent","Present"))
+HCV$Headache <- factor(HCV$Headache, levels = c(1,2), labels = c("Absent","Present"))
+HCV$Diarrhea <- factor(HCV$Diarrhea, levels = c(1,2), labels = c("Absent","Present"))
+HCV$Fatigue.Boneache <- factor(HCV$Fatigue.Boneache, levels = c(1,2), labels = c("Absent","Present"))
+HCV$Jaundice <- factor(HCV$Jaundice, levels = c(1,2), labels = c("Absent","Present"))
+HCV$Epigastria.pain <- factor(HCV$Epigastria.pain, levels = c(1,2), labels = c("Absent","Present"))
+```
+
+La variable `BH.staging` refleja los estados de fibrosis del paciente por tanto deben ser cambiadas a factor ya que de esta forma nos servirá para la mayoría de algoritmos a emplear. Tiene cinco niveles: Sin Fibrosis (F0), Fibrosis portal sin septos (F1), Fibrosis portal con algunos septos (F2), Numerosos septos sin cirrosis (F3) y cirrosis (F4).
+
+```{r clases.factor}
+# Variable class es un factor con dos niveles:
+HCV$BH.staging <- factor(HCV$BH.staging, levels = c(1,2,3,4), labels = c("F1","F2","F3","F4"))
+```
+
+Comprobamos que los cambios se han efectuado correctamente:
+
+```{r str.HCV2}
+# Estructura del conjunto de datos:
+str(HCV)
+```
+
+Observamos que ahora todas las variables están correctamente guardadas en función de los datos que contienen.
+
+
+### Número de observaciones y valores ausentes
+
+Tras guardar los datos correctamente en R, comprobamos el número de pacientes en cada estado hepático.
+
+```{r, echo=FALSE}
+# Cantiadad de muestras de cada clase
+knitr::kable(t(table(HCV$BH.staging)), align = "c",
+             caption= "Cantidad de pacientes en cada uno de los estados de fibrosis hepática.")
+```
+
+Como podemos observar no existen datos para el estado F0 de FH ya que todos los pacientes de este estudio presentan algún grado de fibrosis.
+
+```{r, echo=FALSE}
+# Porcentaje de muestras de cada clase
+knitr::kable(t(round(prop.table(table(HCV$BH.staging)),2)), align = "c",
+             caption= "Poncentaje de muestras en cada uno de los estados de FH en el conjunto de datos HCV.")
+```
+
+
+Observamos que el número de pacientes por cada estado de FH se encuentra balanceado.
+
+Ahora observamos el número de muestras de cada género. En donde encontramos que en el estudio existen más hombre que mujeres con un 3% de diferencia.
+
+```{r, echo=FALSE}
+# Cantiadad de muestras da cada género
+knitr::kable(t(table(HCV$Gender)), align = "c",
+             caption= "Cantidad de muestras de cada género en el conjunto de datos HCV.")
+```
+
+```{r, echo=FALSE}
+# Porcentaje de muestras de cada clase
+knitr::kable(t(round(prop.table(table(HCV$Gender)),2)), align = "c",
+             caption= "Poncentaje de hombres y mujeres en el conjunto de datos HCV.")
+```
+
+```{r save.data, include=FALSE}
+# Guardamos el conjunto de datos como objeto de R
+save(HCV, file = file.path(params$folder.data,"HCV.RData"))
+
+```
+
+
+### Distribución variable respuesta
+
+
+Vamos a estudiar la distribución de la variable respuesta, ya que, es la variable que nos interesa predecir. Observamos la variable `BH.staging` esta balanceada.
+
+```{r, echo=FALSE, fig.height=2.52, fig.width=5.5, fig.cap="Gráfico de barras variable respuesta."}
+## Gráfico de barras:
+library(ggplot2)
+
+ggplot(data = HCV, aes(x = BH.staging, y = ..count.., fill = BH.staging)) +
+  geom_bar() +
+  geom_text(aes(label = ..count..), stat = "count", vjust = 1.5, colour = "white") +
+  scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
+  labs(title = "Cantidad de pacientes por estadios de Fibrosis Hepática") +
+  theme_bw() +
+  theme(legend.position = "right")
+```
+
+Los modelos predictivos deben de tener un porcentaje de acierto superior a lo esperado por azar o a un determinado nivel basal. En problemas de clasificación, el nivel basal es el que se obtiene si se asignan todas las observaciones a la clase mayoritaria (la moda).
+
+```{r porcen.min}
+# Porcentaje de aciertos si se predice para todas las observaciones que padecen LD.
+n_observaciones <- nrow(HCV)
+predicciones <- rep(x = "F4",  n_observaciones)
+mean(predicciones == HCV$BH.staging) * 100 
+
+# porcentaje mínimo que hay que superar con los modelos predictivos
+
+```
+
+Debido a que los datos están balanceados el porcentaje mínimo que hay que intentar superar con los modelos predictivos es del `r round(mean(predicciones == HCV$BH.staging) * 100,2)`%.
+
+### Distribución de las variables continuas
+
+
+Exploramos los datos de las variables continuas. Realizamos un breve resumen estadístico de las variables numéricas del conjunto:
+
+```{r, echo=FALSE}
+## Resumen estadístico variables numéricas
+stats <- data.frame()
+num_index <- as.vector(which(sapply(HCV, is.numeric)==TRUE))
+
+for (i in num_index) {
+  stat <- summary(HCV[[i]])
+  stats <- rbind(stats,stat)
+}
+colnames(stats) <- names(stat)
+rownames(stats) <- colnames(HCV[num_index])
+
+knitr::kable(stats, digits = 2, align = "l",
+             caption= "Estadísticas descriptivas de las variables numéricas")
+
+```
+
+El resumen estadístico de las variables numéricas nos dice que la distribución de las variables es aparentemente normal debemos analizar por separado a las variables `RNA.12`, `RNA.EOT`, `RNA.EF`, en donde la media se separa de la mediana para comprender cuales son las razones.
+
+Observamos que se puede mejorar la calidad de los datos si normalizamos los mismos. Aplicamos una función de normalización para graficar los datos en la misma escala.
+
+Creamos una función para normalizar los datos en base a mínimos y máximos para que tengan valores entre 0 y 1 y poder observar todos los datos a la misma escala.
+
+```{r, echo=FALSE}
+
+#Función
+normalizar <- function(x) {
+return((x -min(x)) / (max(x) -min(x)))
+}
+
+# Aplicamos la función a las variables numericas
+
+mynum <- HCV[, sapply(HCV, is.numeric)]
+
+mynum.norm <- as.data.frame(lapply(mynum, normalizar))
+
+
+```
+
+Se realiza un gráfico de boxplot para observar la distribución de los datos con escala entre 0 y 1.
+
+```{r, echo=FALSE, cache=TRUE, fig.height=3, fig.width=5.5, fig.cap="Boxplots de las variables numéricas."}
+## Boxplots
+
+par(oma=c(0,0,0,0), mar=c(2,2,0.5,0))
+
+boxplot(mynum.norm, col="lightblue")
+```
+
+Se pueden observar valores atípicos en las variables de `ALT.after.24.w` y `RNA.12`
+
+***Tratamiento de valores atípicos***
+
+Se analiza cada uno de los valores atípicos y considerando las referencias bibliográficas de las pruebas PCR para detección de Virus de la hepatitis C se considera que estos datos pertenecen a un caso excepcional y no a un error, sin embargo sabemos que los valores atípicos si pueden influir en los modelos de aprendizaje por tanto y considerando que se tiene una cantidad suficiente de datos se eliminaran los outliers para la exploración de datos.
+
+Utilizamos la prueba de Grubbs para detectar un valor atipico en la variable `RNA.12` ya que tenemos una gran cantidad de datos, esta prueba nos ayuda a detectar un único valor atípico mediante un test de hipótesis nula la cual establece que no hay valores atípicos en los datos, con una significancia de valor p = 0.05.
+
+```{r prueba outlier, echo=FALSE}
+grubbs.test(mynum$RNA.12)
+
+```
+
+En este caso se rechaza la hipótesis nula, y nos dice que el valor atípico es de `3731527`, el cual procederemos a eliminar en nuestra base de datos.
+
+Ahora realizamos la prueba para los valores atípicos de la variable `ALT.after.24.w`
+
+```{r prueba outlier2, echo=FALSE}
+grubbs.test(mynum$ALT.after.24.w)
+```
+
+Nuevamente se rechaza la hipótesis nula, por tanto procedemos a eliminar los datos con valores atípicos.
+
+```{r eliminacion de datos, echo=FALSE}
+data <- HCV
+HCV<- HCV[-458,]
+HCV<- HCV[-5,]
+HCV<- HCV[-3,]
+HCV<- HCV[-1,]
+
+mynum <- mynum[-458,]
+mynum <- mynum[-5,]
+mynum <- mynum[-3,]
+mynum <- mynum[-1,]
+
+mynum.norm <- mynum.norm[-458,]
+mynum.norm <- mynum.norm[-5,]
+mynum.norm <- mynum.norm[-3,]
+mynum.norm <- mynum.norm[-1,]
+
+HCV3 <- HCV %>% 
+  mutate_if(is.numeric, normalizar)
+
+```
+
+
+```{r save.data2, include=FALSE}
+# Guardamos el conjunto de datos como objeto de R
+save(HCV3, file = file.path(params$folder.data,"HCV3.RData"))
+
+```
+
+Se realiza gráficos de dispersión enfrentando todas las variables numéricas entre sí:
+
+```{r, echo=FALSE, cache=TRUE, fig.height=6, fig.width=10, fig.cap="Gráficos de dispersión entre las variables numéricas."}
+
+# Crear el gráfico de dispersión
+pairs.panels(mynum.norm, gap=0, method = "spearman")
+
+# Agregar una leyenda
+legend("topright", pch=16, c("F1", "F2", "F3", "F4"), col=1:2, cex=0.8)
+
+```
+
+Los cocientes de relación más altos entre las variables son *0.41* y *0.42* de las variables `RNA.EOT` y `RNA.EF` con `RNA.12` respectivamente por lo cual se observa que no existe una correlación entre las variables. Respecto a la distribución de los datos podemos observar que estos tienen distribuciones uniformes, excepto por las variables `RNA.12`, `RNA.EOT` y `RNA.EF` que tienen una asimetría hacia la derecha.
+
+
+```{r, echo=FALSE}
+
+## Función para crear gráficos
+crear_plot <- function(vars, name.vars){
+  p1 <- ggplot(data = HCV, aes(y = vars, fill = BH.staging)) +
+    geom_density(alpha = 0.5) +
+    scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
+    geom_rug(aes(color = BH.staging), alpha = 0.5) +
+    scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
+    coord_flip() +
+    theme_bw()+
+    ylab(name.vars)
+
+  p2 <- ggplot(data = HCV, aes(x = BH.staging, y = vars, color = BH.staging)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(alpha = 0.3, width = 0.15) +
+    scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
+    theme_bw()+
+    ylab(name.vars)
+
+  final_plot <- ggarrange(p1, p2, legend = "top")
+  final_plot <-annotate_figure(final_plot, top = text_grob(name.vars, size = 15))
+ final_plot
+  
+}
+
+```
+
+```{r, echo=FALSE}
+## Resumen estadístico de la variable por clase
+crear_stats <- function(vars, name.vars){ 
+  stats <- HCV %>% group_by(BH.staging) %>%
+    summarise(media = mean(vars),
+              mediana = median(vars),
+              min = min(vars),
+              max = max(vars))
+
+  knitr::kable(stats, digits = 2, align = "l",
+              caption= paste0("Estadísticas descriptivas de ", name.vars, " por clase.")) 
+
+}
+```
+
+
+```{r, echo=FALSE}
+
+test.chi <- function(vars, name.vars){
+  tabla_contingencia <- table(vars, HCV$BH.staging)
+  
+  resultado_chisq <- chisq.test(tabla_contingencia)
+  
+  cat("\n", "Test Chi-cuadrado:\n")
+  cat("Estadístico de prueba = ", resultado_chisq$statistic, "\n")
+  cat("p-valor = ", resultado_chisq$p.value, "\n")
+}
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Age."}
+crear_plot(mynum$Age, "Age")
+
+crear_stats(mynum$Age, "Age")
+
+test.chi(mynum$Age, "Age")
+```
+
+
+```{r, echo=FALSE, fig.cap="Gráficos variable BMI."}
+crear_plot(mynum$BMI, "BMI")
+
+crear_stats(mynum$BMI, "BMI")
+
+test.chi(mynum$BMI, "BMI")
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable WBC."}
+crear_plot(mynum$WBC, "WBC")
+
+crear_stats(mynum$WBC, "WBC")
+
+test.chi(mynum$WBC, "WBC")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable RBC."}
+crear_plot(mynum$RBC, "RBC")
+
+crear_stats(mynum$RBC, "RBC")
+
+test.chi(mynum$RBC, "RBC")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable HGB."}
+crear_plot(mynum$HGB, "HGB")
+
+crear_stats(mynum$HGB, "HGB")
+
+test.chi(mynum$HGB, "HGB")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Plat."}
+crear_plot(mynum$Plat, "Plat")
+
+crear_stats(mynum$Plat, "Plat")
+
+test.chi(mynum$Plat, "Plat")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable AST.1."}
+crear_plot(mynum$AST.1, "AST.1")
+
+crear_stats(mynum$AST.1, "AST.1")
+
+test.chi(mynum$AST.1, "AST.1")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable ALT.1."}
+crear_plot(mynum$ALT.1, "ALT.1")
+
+crear_stats(mynum$ALT.1, "ALT.1")
+
+test.chi(mynum$ALT.1, "ALT.1")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable ALT.4."}
+crear_plot(mynum$ALT.4, "ALT.4")
+
+crear_stats(mynum$ALT.4, "ALT.4")
+
+test.chi(mynum$ALT.4, "ALT.4")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable ALT.12."}
+crear_plot(mynum$ALT.12, "ALT.12")
+
+crear_stats(mynum$ALT.12, "ALT.12")
+
+test.chi(mynum$ALT.12, "ALT.12")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable ALT.24."}
+crear_plot(mynum$ALT.24, "ALT.24")
+
+crear_stats(mynum$ALT.24, "ALT.24")
+
+test.chi(mynum$ALT.24, "ALT.24")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable ALT.36."}
+crear_plot(mynum$ALT.36, "ALT.36")
+
+crear_stats(mynum$ALT.36, "ALT.36")
+
+test.chi(mynum$ALT.36, "ALT.36")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable ALT.48."}
+crear_plot(mynum$ALT.48, "ALT.48")
+
+crear_stats(mynum$ALT.48, "ALT.48")
+
+test.chi(mynum$ALT.48, "ALT.48")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable ALT.after.24.w."}
+crear_plot(mynum$ALT.after.24.w, "ALT.after.24.w")
+
+crear_stats(mynum$ALT.after.24.w, "ALT.after.24.w")
+
+test.chi(mynum$ALT.after.24.w, "ALT.after.24.w")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable RNA.Base."}
+crear_plot(mynum$RNA.Base, "RNA.Base")
+
+crear_stats(mynum$RNA.Base, "RNA.Base")
+
+test.chi(mynum$RNA.Base, "RNA.Base")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable RNA.4."}
+crear_plot(mynum$RNA.4, "RNA.4")
+
+crear_stats(mynum$RNA.4, "RNA.4")
+
+test.chi(mynum$RNA.4, "RNA.4")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable RNA.12."}
+crear_plot(mynum$RNA.12, "RNA.12")
+
+crear_stats(mynum$RNA.12, "RNA.12")
+
+test.chi(mynum$RNA.12, "RNA.12")
+
+```
+
+
+
+
+```{r, echo=FALSE, fig.cap="Gráficos variable RNA.EOT."}
+crear_plot(mynum$RNA.EOT, "RNA.EOT")
+
+crear_stats(mynum$RNA.EOT, "RNA.EOT")
+
+test.chi(mynum$RNA.EOT, "RNA.EOT")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable RNA.EF."}
+crear_plot(mynum$RNA.EF, "RNA.EF")
+
+crear_stats(mynum$RNA.EF, "RNA.EF")
+
+test.chi(mynum$RNA.EF, "RNA.EF")
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable BH.grading."}
+crear_plot(mynum$BH.grading, "BH.grading")
+
+crear_stats(mynum$BH.grading, "BH.grading")
+
+test.chi(mynum$BH.grading, "BH.grading")
+
+```
+
+Se realiza una tabla resumen de los valores obtenidos.
+
+```{r, echo=FALSE, fig.height=6, fig.width=10, fig.cap="Boxplots de variables continuas por clase de BH.staging"}
+
+mynum.norm2 <- as.data.frame(lapply(mynum, normalizar))
+
+subdata<-cbind(clase=HCV$BH.staging, mynum.norm2)
+subdata_longer<-subdata%>%
+pivot_longer(cols =-1,names_to ="variable",values_to ="valor")
+
+# boxplot múltiple genes para cada clase de tumor
+ggplot(subdata_longer,aes(x=variable,y =valor,fill =clase))+
+geom_boxplot()+
+  scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
+    ggtitle("Boxplots de variables continuas por clase de BH.staging")+
+xlab("Clase de BH.staging")+
+ylab("Valor")+
+theme(legend.title =element_blank())
+
+
+```
+
+Hemos normalizado las variables para poder visualizarlas en un solo gráfico, dentro de los gráficos de cajas existen tres variables que tienen una distribución distinta como también los hemos observado en el gráfico de densidad, se consideran una distribución uniforme truncada hacia la izquierda, sin embargo ya que se realizado el *Test Chi-cuadrado* cuyo *p-valor* nos indica que se acepta la hipótesis nula, asegurando que mantienen una distribución uniforme.
+
+
+### Distribución de las variables cualitativas
+
+En total tenemos 8 variables cualitativas.
+
+
+```{r, echo=FALSE}
+
+## Función para crear gráficos
+
+crear_barras <- function(vars, name.vars){
+  p1 <- ggplot(data = HCV, aes(x= vars, fill = BH.staging)) +
+    geom_bar() +
+    labs(title = name.vars) +
+    scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
+    geom_rug(aes(x = vars, color = BH.staging), alpha = 0.5) +
+    scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
+    coord_flip() +
+    theme_bw()+
+    theme(legend.position = "bottom") +
+    xlab(name.vars) +
+    stat_count(aes(label = ..count..), geom = "text", vjust = 0.5)
+  
+  
+  p1
+  
+}
+
+```
+
+
+```{r, echo=FALSE}
+crear_porc <- function(data, var){
+  
+# Tabla de frecuencias relativas de clases 
+  tabla1 <- prop.table(table(data[[var]], data$BH.staging), margin = 1) %>% round(digits = 2)
+  
+# Cantidad de muestras de cada clase
+  knitr::kable(tabla1, align = "c",
+               caption= paste("Poncentaje de muestras de cada estadío de FH por ", var, " en el conjunto de datos."))
+}
+
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Gender."}
+crear_barras(HCV$Gender, "Gender")
+crear_porc(HCV, "Gender")
+
+```
+
+
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Fever."}
+crear_barras(HCV$Fever, "Fever")
+crear_porc(HCV, "Fever")
+```
+
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Nausea.Vomiting."}
+crear_barras(HCV$Nausea.Vomiting, "Nausea.Vomiting")
+crear_porc(HCV, "Nausea.Vomiting")
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Headache"}
+crear_barras(HCV$Headache, "Headache")
+crear_porc(HCV, "Headache")
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Diarrhea"}
+crear_barras(HCV$Diarrhea, "Diarrhea")
+crear_porc(HCV, "Diarrhea")
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Fatigue.Boneache"}
+crear_barras(HCV$Fatigue.Boneache, "Fatigue.Boneache")
+crear_porc(HCV, "Fatigue.Boneache")
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Jaundice"}
+crear_barras(HCV$Jaundice, "Jaundice")
+crear_porc(HCV, "Jaundice")
+```
+
+```{r, echo=FALSE, fig.cap="Gráficos variable Epigastria.pain"}
+crear_barras(HCV$Epigastria.pain, "Epigastria.pain")
+crear_porc(HCV, "Epigastria.pain")
+```
+
+
+Como se puede observar en los gráficos y las proporciones en las tablas son semejantes entre los grupos, por tanto no se sospecha de alguna diferencia estadísticamente significativa entre los mismos.
+
+
+### Selección de variables
+
+Buscaremos las relaciones que puedan existir entre las variables
+
+**Correlación entre variables continuas**
+
+Considerando que la distribución de las variables es uniforme utilizaremos para la correlación el método de Spearman.
+
+```{r, cor.mynum}
+# Crear matriz de correlación
+corr_mat <- cor(x = mynum.norm, method = "spearman")
+colnames(corr_mat) <- names(mynum.norm)
+
+# Crear corrplot con etiquetas de título y significancia
+corrplot(corr_mat, method = "color", 
+         title = "Correlación entre variables numéricas",
+         tl.col = "black", tl.pos = "n", 
+         mar = c(2, 1, 3, 1))
+
+corr_mat
+
+# Calcular el coeficiente de correlación de Spearman
+cor.test(HCV$RNA.12, HCV$RNA.EOT, method = "spearman")
+
+cor.test(HCV$RNA.12, HCV$RNA.EF, method = "spearman")
+
+cor.test(HCV$RNA.EOT, HCV$RNA.EF, method = "spearman")
+
+```
+
+Como podemos observar varias correlaciones regulares y tres correlaciones buenas entre las variables, las correlaciones más altas no superan un factor de correlación de 0.61, sin embargo al realizar el test de correlación de Spearman se confirma que existe una correlación positiva y moderada entre las dos variables.
+
+
+**Variables con varianza cero o próxima a cero**
+
+En una distribución uniforme es muy poco probable que la varianza sea igual a cero ya que cada valor tiene la misma probabilidad de aparecer, y en esta base de datos tampoco se manejan datos muy pequeños por los que se pueda confundir una varianza cercana a cero, sin embargo realizaremos este paso para confirmarlo.
+
+```{r var.data4}
+# Varianza de las variables numéricas
+round(apply(mynum.norm, 2, var),2)
+
+library(caret)
+nearZeroVar(mynum.norm, saveMetrics = TRUE)
+```
+
+
+Se comprueba que ninguna de las variables tiene una varianza igual a cero.
+
+## Preprocesamiento de datos
+
+### Selección de predictores:
+
+La selección de predictores es un paso necesario para identificar las variables más relevantes que contribuyen a la predicción del objetivo, en este caso de los estadios de FH. Después de haber realizado el análisis exploratorio de datos se ha filtrado con la técnica Ramdow Forest y una filtración Gini.
+
+**Importancia de las variables con Random Forest**
+
+El índice Gini en Random Forest es utilizado para medir la importancia de las variables en la predicción de la variable respuesta, por tanto nos será de ayuda al momento de mejorar el modelo.
+
+```{r, echo=FALSE, cache=TRUE}
+## Importancia de las variables con Random Forest:
+
+modelo_randforest <- randomForest(formula = BH.staging ~ . ,
+                                  data = HCV3,
+                                  mtry = 5,
+                                  importance = TRUE, 
+                                  ntree = 1000) 
+
+
+importancia <- as.data.frame(modelo_randforest$importance)
+importancia <- rownames_to_column(importancia,var = "variable")
+
+
+
+p1 <- ggplot(data = importancia, aes(x = reorder(variable, MeanDecreaseAccuracy),
+                                     y = MeanDecreaseAccuracy,
+                                     fill = MeanDecreaseAccuracy)) +
+  labs(x = "variable", title = "Reducción de Accuracy") +
+  geom_col() +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+p2 <- ggplot(data = importancia, aes(x = reorder(variable, MeanDecreaseGini),
+                                     y = MeanDecreaseGini,
+                                     fill = MeanDecreaseGini)) +
+  labs(x = "variable", title = "Reducción de pureza (Gini)") +
+  geom_col() +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "bottom")
+ggarrange(p1, p2)
+```
+
+Las variables con menos importancia son las variables cualitativas relacionadas con la sintomatología del paciente.
+
+### Partición de datos training y test
+
+```{r train.test}
+# Particion de los datos train/test
+
+set.seed(77)
+## Muestras que pertenecen al conjunto train
+n_train <- createDataPartition(HCV$BH.staging, p = 0.7, list = FALSE)
+
+## Eliminamos las variables con menos importancia
+HCV2<- HCV3
+
+HCV2 <- HCV2 %>% 
+         select(-Epigastria.pain, -Gender, -Headache, -Nausea.Vomiting, -Jaundice, -Fatigue.Boneache, -Fever, -Diarrhea, -RNA.12, -RNA.EOT, -RNA.EF, -HGB, -BH.grading)
+
+## Creamos los conjuntos train y test:
+train.d <- HCV2[n_train,]
+test.d <- HCV2[-n_train,]
+
+## Variable objetivo por conjunto de datos
+label_train <- HCV2[n_train,length(HCV2)]
+label_test <- HCV2[-n_train,length(HCV2)]
+```
+
+
+Considerando que tanto predictores como variable respuesta tienen una distribución uniforme los datos al ser escogidos al azar deberían mantener la distribución, sin embargo para asegurarse de ello usamos la función `createDataPartition` para mantener la proporción en la partición de datos.
+
+También hay que destacar que aunque los datos tienen una distribución uniforme han sido normalizados considerando que existen una gran variabilidad entre una variable y otra.
+
+De los `r dim(HCV)[1]` registros iniciales, el conjunto *train* contiene `r dim(train.d)[1]` registros y el conjunto *test* contiene `r dim(test.d)[1]` registros. Los porcentajes parecen indicar que los datos se han dividido equitativamente entre los subconjuntos de datos.
+
+
+```{r, echo=FALSE}
+# Confirmamos que los subconjuntos son representativos del conjunto completo de datos
+prob_train <- prop.table(table(label_train))
+prob_test <- prop.table(table(label_test))
+
+prob <- as.data.frame(rbind(prob_train,prob_test))
+row.names(prob) <- c("% Train", "% Test")
+
+knitr::kable(prob, align = "c", digits = 2,
+             caption = "Porcentaje de cada tipo de localización en los conjuntos train y test.")
+```
+
+
+### Preparación de datos
+
+```{r}
+# Preparamos los conjuntos de datos para que sean preprocesados
+data_train <- train.d
+data_test  <- test.d
+data_tn <- data_train
+data_tt <- data_test
+data_tn2 <- data_train
+data_tt2 <- data_test
+```
+
+En el preprocesado de los datos, se han generado un total de 29 variables (28 predictores y la variable respuesta).
+
+# Creación de modelos predictivos:
+
+Utilizamos el paquete `caret` para generar y entrenar los diferentes modelos de aprendizaje automático, proporcionando diferentes hiperparámetros y buscando el modelo con mejor rendimiento.
+
+## Modelo k-Nearest Neighbor (KNN)
+
+Generamos el modelo KNN 
+
+```{r, cache=TRUE}
+# Cargar el paquete caret
+library(caret)
+
+particiones <- 20
+repeticiones <- 20
+hiperparámetros <- data.frame(k = c(5,10,15,20,25,30))
+
+set.seed(12345)
+seed <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seed[[i]] <- sample.int(1000, nrow(hiperparámetros))
+}
+seed[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+# Entrenamiento
+control_train <- trainControl(
+  method = "repeatedcv",
+  number = particiones,
+  repeats = repeticiones,
+  seed = seed,
+  returnResamp = "final",
+  verboseIter = FALSE,
+  allowParallel = TRUE
+)
+
+# Ajuste del modelo
+set.seed(23456)
+modelo_knn <- caret::train(
+  BH.staging ~ .,
+  data = data_tn,
+  method = "knn",
+  tuneGrid = hiperparámetros,
+  metric = "Accuracy",
+  trControl = control_train
+)
+
+modelo_knn
+
+```
+
+
+```{r}
+
+# Gráfico
+ggplot(modelo_knn, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo KNN") +
+  theme_bw()
+
+# Obtener la matriz de confusión
+predicciones_knn <- predict(modelo_knn, newdata = data_tt, type = "raw")
+conf_mat_knn <- caret::confusionMatrix(
+  factor(predicciones_knn, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+
+# Crear objeto stats_class_knn con las estadísticas extraídas
+stats_class_knn <- data.frame(
+  model = "KNN",
+  precision = conf_mat_knn$overall["Accuracy"],
+  FN = conf_mat_knn$table[2,1],
+  FP = conf_mat_knn$table[1,2],
+  error.rate = 1 - conf_mat_knn$overall["Accuracy"],
+  kappa = conf_mat_knn$overall["Kappa"],
+  sensibilidad = mean(conf_mat_knn$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_knn$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_knn$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_knn$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_knn$byClass[,"F1"])
+)
+
+stats_class_knn
+```
+
+
+## Modelo Naive Bayes (NB)
+
+Generamos el modelo NB. 
+
+```{r}
+particiones <- 10
+repeticiones <- 10
+
+# Definir los hiperparámetros para Naive Bayes
+hiperparámetros <- expand.grid(
+  laplace = c(0, 1, 2, 3),
+  usekernel = c(FALSE, TRUE),
+  adjust = c(FALSE, TRUE)
+)
+
+set.seed(12345)
+seed <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seed[[i]] <- sample.int(1000, nrow(hiperparámetros))
+}
+seed[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+# Entrenamiento
+control_train <- trainControl(
+  method = "repeatedcv",
+  number = particiones,
+  repeats = repeticiones,
+  seed = seed,
+  returnResamp = "final",
+  verboseIter = FALSE,
+  allowParallel = TRUE
+)
+
+# Ajuste del modelo Naive Bayes
+set.seed(23456)
+modelo_nb <- caret::train(
+  BH.staging ~ .,
+  data = data_tn,
+  method = "naive_bayes",
+  tuneGrid = hiperparámetros,
+  metric = "Accuracy",
+  trControl = control_train
+)
+
+
+modelo_nb
+
+
+```
+
+
+
+```{r}
+
+# Gráfico
+ggplot(modelo_nb, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo NB") +
+  theme_bw()
+
+# Obtener la matriz de confusión
+predicciones_nb <- predict(modelo_nb, newdata = data_tt, type = "raw")
+conf_mat_nb <- caret::confusionMatrix(
+  factor(predicciones_nb, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+
+# Crear objeto stats_class_nb con las estadísticas extraídas
+stats_class_nb <- data.frame(
+  model = "Naive Bayes",
+  precision = conf_mat_nb$overall["Accuracy"],
+  FN = conf_mat_nb$table[2,1],
+  FP = conf_mat_nb$table[1,2],
+  error.rate = 1 - conf_mat_nb$overall["Accuracy"],
+  kappa = conf_mat_nb$overall["Kappa"],
+  sensibilidad = mean(conf_mat_nb$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_nb$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_nb$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_nb$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_nb$byClass[,"F1"])
+)
+
+stats_class_nb
+```
+
+## Modelo Multilayer perceptron (MLP)
+
+Generamos el modelo MLP.
+
+```{r}
+# Número de particiones y repeticiones
+particiones  <- 20
+repeticiones <- 20
+
+#hiperparametros <- expand.grid(size = c(1:20),
+#                                decay = c(0.0001, 0.1, 0.5))
+
+hiperparametros <- expand.grid(size = c(1:5),
+                              decay = c(0.0001))
+
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_mlp <- caret::train(BH.staging ~ ., 
+                    data = data_tn,
+                    method = "mlpWeightDecay",
+                    tuneGrid = hiperparametros,
+                    metric = "Accuracy",
+                    trControl = control_train,
+                    learnFunc = "Std_Backpropagation")
+modelo_mlp
+```
+
+
+```{r}
+# REPRESENTACIÓN GRÁFICA
+ggplot(modelo_mlp, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo MLP") +
+  theme_bw()
+
+
+# Predicciones
+predicciones_mlp <- predict(modelo_mlp, newdata = data_tt,
+                            type = "raw")
+
+
+# Evaluación
+conf_mat_mlp <- caret::confusionMatrix(factor(predicciones_mlp, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_mlp
+
+stats_class_mlp <- data.frame(model         = "MLP", 
+ precision = conf_mat_mlp$overall["Accuracy"],
+  FN = conf_mat_mlp$table[2,1],
+  FP = conf_mat_mlp$table[1,2],
+  error.rate = 1 - conf_mat_mlp$overall["Accuracy"],
+  kappa = conf_mat_mlp$overall["Kappa"],
+  sensibilidad = mean(conf_mat_mlp$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_mlp$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_mlp$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_mlp$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_mlp$byClass[,"F1"])
+)
+
+stats_class_mlp
+```
+
+## Modelo Support vector machine linear kernel (SVM-lineal)
+
+Generamos el modelo SVM-lineal.
+
+```{r, cache=TRUE}
+# se recurre a validación cruzada repetida como método de validación.
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+hiperparametros <- data.frame(C = c(40,50,60,70,80,90))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_svmlineal <- caret::train(BH.staging ~ ., data = data_tn,
+                          method = "svmLinear",
+                          tuneGrid = hiperparametros,
+                          metric = "Accuracy",
+                          trControl = control_train)
+
+modelo_svmlineal
+
+
+```
+
+```{r}
+# Predicciones
+predicciones_svmlineal <- predict(modelo_svmlineal, newdata = data_tt, type = "raw")
+
+conf_mat_svmlineal <- caret::confusionMatrix(factor(predicciones_svmlineal, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+
+conf_mat_svmlineal
+
+# REPRESENTACIÓN GRÁFICA
+ggplot(modelo_svmlineal, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo SVMlineal") +
+  theme_bw()
+
+stats_class_svmlineal <- data.frame(model = "SVMlineal",
+  precision = conf_mat_svmlineal$overall["Accuracy"],
+  FN = conf_mat_svmlineal$table[2,1],
+  FP = conf_mat_svmlineal$table[1,2],
+  error.rate = 1 - conf_mat_svmlineal$overall["Accuracy"],
+  kappa = conf_mat_svmlineal$overall["Kappa"],
+  sensibilidad = mean(conf_mat_svmlineal$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_svmlineal$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_svmlineal$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_svmlineal$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_svmlineal$byClass[,"F1"])
+)
+stats_class_svmlineal 
+```
+
+
+## Modelo Support vector machine polynomial kernel (SVM-polynomial)
+
+Generamos el modelo SVM-polynomial.
+
+```{r, cache=TRUE}
+# se recurre a validación cruzada repetida como método de validación.
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+
+hiperparametros <- expand.grid(degree = c(2),
+                               scale = c(0.1,0.2,0.3,0.5),
+                               C = c(10,20,30,40))
+
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_svmPoly <- caret::train(BH.staging ~ ., data = data_tn,
+                        method = "svmPoly",
+                        tuneGrid = hiperparametros,
+                        metric = "Accuracy",
+                        trControl = control_train)
+
+modelo_svmPoly
+```
+
+```{r, cache=TRUE}
+
+# Predicciones
+predicciones_svmPoly <- predict(modelo_svmPoly, newdata = data_tt,
+                                type = "raw")
+predicciones_svmPoly
+
+
+# Evaluación
+conf_mat_svmPoly <- caret::confusionMatrix(factor(predicciones_svmPoly, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_svmPoly
+
+# REPRESENTACIÓN GRÁFICA
+ggplot(modelo_svmPoly, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo SVMpoly") +
+  theme_bw()
+
+stats_class_svmPoly <- data.frame(model         = "SVMpoly",
+  precision = conf_mat_svmPoly$overall["Accuracy"],
+  FN = conf_mat_svmPoly$table[2,1],
+  FP = conf_mat_svmPoly$table[1,2],
+  error.rate = 1 - conf_mat_svmPoly$overall["Accuracy"],
+  kappa = conf_mat_svmPoly$overall["Kappa"],
+  sensibilidad = mean(conf_mat_svmPoly$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_svmPoly$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_svmPoly$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_svmPoly$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_svmPoly$byClass[,"F1"])
+)
+stats_class_svmPoly
+```
+
+
+## Modelo Support vector machine radial kernel (SVM-radial)
+
+Generamos el modelo SVM-radial.
+
+```{r, cache=TRUE}
+# se recurre a validación cruzada repetida como método de validación.
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+
+hiperparametros <- expand.grid(sigma = c(0.1, 0.5, 3,5,10),
+                               C = c(10,15,20,40,50))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_svmRadial <- caret::train(BH.staging ~ ., data = data_tn,
+                          method = "svmRadial",
+                          tuneGrid = hiperparametros,
+                          metric = "Accuracy",
+                          trControl = control_train)
+modelo_svmRadial
+```
+
+```{r, cache=TRUE}
+# Predicciones
+predicciones_svmRadial <- predict(modelo_svmRadial, newdata = data_tt,
+                                  type = "raw")
+
+# Evaluación
+conf_mat_svmRadial <- caret::confusionMatrix(factor(predicciones_svmRadial, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_svmRadial
+
+# REPRESENTACIÓN GRÁFICA
+ggplot(modelo_svmRadial, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo SVMradial") +
+  theme_bw()
+
+
+stats_class_svmRadial <- data.frame(model         = "SVMradial",
+   precision = conf_mat_svmRadial$overall["Accuracy"],
+  FN = conf_mat_svmRadial$table[2,1],
+  FP = conf_mat_svmRadial$table[1,2],
+  error.rate = 1 - conf_mat_svmRadial$overall["Accuracy"],
+  kappa = conf_mat_svmRadial$overall["Kappa"],
+  sensibilidad = mean(conf_mat_svmRadial$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_svmRadial$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_svmRadial$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_svmRadial$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_svmRadial$byClass[,"F1"])
+)
+stats_class_svmRadial
+```
+
+
+## Modelo Decision tree C5.0 sin hiperparámetros (C5.0)
+
+Generamos el modelo C5.0.
+
+```{r, cache=TRUE}
+# se recurre a validación cruzada repetida como método de validación.
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+hiperparametros <- data.frame(parameter = "none")
+
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_C5.0Tree <- caret::train(BH.staging ~ ., data = data_tn,
+                         method = "C5.0Tree",
+                         tuneGrid = hiperparametros,
+                         metric = "Accuracy",
+                         trControl = control_train)
+modelo_C5.0Tree
+
+
+summary(modelo_C5.0Tree$finalModel)
+```
+
+```{r, cache=TRUE}
+
+#ggplot(modelo_C5.0Tree, highlight = TRUE) +
+ # labs(title = "Evolución del accuracy del modelo") +
+  #theme_bw()
+
+# Predicciones
+predicciones_C5.0Tree <- predict(modelo_C5.0Tree, newdata = data_tt,
+                                 type = "raw")
+
+# Evaluación
+conf_mat_C5.0Tree <- caret::confusionMatrix(factor(predicciones_C5.0Tree, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_C5.0Tree
+
+
+stats_class_C5.0Tree <- data.frame(model         = "C5.0Tree",
+   precision = conf_mat_C5.0Tree$overall["Accuracy"],
+  FN = conf_mat_C5.0Tree$table[2,1],
+  FP = conf_mat_C5.0Tree$table[1,2],
+  error.rate = 1 - conf_mat_C5.0Tree$overall["Accuracy"],
+  kappa = conf_mat_C5.0Tree$overall["Kappa"],
+  sensibilidad = mean(conf_mat_C5.0Tree$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_C5.0Tree$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_C5.0Tree$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_C5.0Tree$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_C5.0Tree$byClass[,"F1"])
+)
+stats_class_C5.0Tree
+```
+
+## Modelo Decision tree C5.0 con hiperparámetros (C5.0)
+
+Generamos el modelo C5.0.
+
+```{r, cache=TRUE}
+# se recurre a validación cruzada repetida como método de validación.
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+
+hiperparametros <- expand.grid(trials = c(15:20),
+                               model = "tree",
+                               winnow = c(FALSE))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_C5.0 <- caret::train(BH.staging ~ ., data = data_tn,
+                     method = "C5.0",
+                     tuneGrid = hiperparametros,
+                     metric = "Accuracy",
+                     trControl = control_train)
+modelo_C5.0
+
+
+summary(modelo_C5.0$finalModel)
+```
+
+```{r, cache=TRUE}
+ggplot(modelo_C5.0, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo") +
+  theme_bw()
+
+# Predicciones
+predicciones_C5.0 <- predict(modelo_C5.0, newdata = data_tt,
+                             type = "raw")
+
+
+# Evaluación
+conf_mat_C5.0 <- caret::confusionMatrix(factor(predicciones_C5.0), factor(data_tt$BH.staging))
+conf_mat_C5.0
+
+
+stats_class_C5.0 <- data.frame(model         = "C5.0",
+   precision = conf_mat_C5.0$overall["Accuracy"],
+  FN = conf_mat_C5.0$table[2,1],
+  FP = conf_mat_C5.0$table[1,2],
+  error.rate = 1 - conf_mat_C5.0$overall["Accuracy"],
+  kappa = conf_mat_C5.0$overall["Kappa"],
+  sensibilidad = mean(conf_mat_C5.0$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_C5.0$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_C5.0$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_C5.0$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_C5.0$byClass[,"F1"])
+)
+stats_class_C5.0
+```
+## Modelo Decision tree J48 (J48)
+
+Generamos el modelo J48.
+
+```{r, cache=TRUE}
+# se recurre a validación cruzada repetida como método de validación.
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+hiperparametros <- expand.grid(C = c(0.5),
+                               M = c(5:15))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros))
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+library(RWeka)
+set.seed(342)
+modelo_J48 <- caret::train(BH.staging ~ ., data = data_tn,
+                    method = "J48",
+                    tuneGrid = hiperparametros,
+                    metric = "Accuracy",
+                    trControl = control_train)
+modelo_J48
+
+
+summary(modelo_J48$finalModel)
+```
+
+```{r, cache=TRUE}
+
+ggplot(data = modelo_J48, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo J48") +
+  theme_bw()
+
+# Predicciones
+predicciones_J48 <- predict(modelo_J48, newdata = data_tt,  type = "raw")
+
+# Evaluación
+conf_mat_J48 <- caret::confusionMatrix(factor(predicciones_J48, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_J48
+
+stats_class_J48 <- data.frame(model = "J48",
+  precision = conf_mat_J48$overall["Accuracy"],
+  FN = conf_mat_J48$table[2,1],
+  FP = conf_mat_J48$table[1,2],
+  error.rate = 1 - conf_mat_J48$overall["Accuracy"],
+  kappa = conf_mat_J48$overall["Kappa"],
+  sensibilidad = mean(conf_mat_J48$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_J48$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_J48$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_J48$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_J48$byClass[,"F1"])
+)
+stats_class_J48
+```
+
+## Modelo Random forest (RF)
+
+Generamos el modelo RF.
+
+```{r, cache=TRUE}
+# se recurre a validación cruzada repetida como método de validación.
+# Número de particiones y repeticiones
+library(ranger)
+particiones  <- 10
+repeticiones <- 10
+
+
+hiperparametros <- expand.grid(mtry = c(1:20),
+                               min.node.size = c(4, 5, 10, 20),
+                               splitrule = c("gini"))
+
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO 
+set.seed(342)
+modelo_rf <- caret::train(BH.staging ~ ., data = data_tn,
+                   method = "ranger",
+                   tuneGrid = hiperparametros,
+                   metric = "Accuracy",
+                   trControl = control_train,
+                   # Número de ?rboles ajustados
+                   num.trees = 500)
+modelo_rf
+
+summary(modelo_rf$finalModel)
+```
+
+```{r, cache=TRUE}
+
+# REPRESENTACIÓN GRÁFICA
+ggplot(modelo_rf, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo RF") +
+  theme_bw()
+
+
+# Predicciones
+predicciones_rf <- predict(modelo_rf, newdata = data_tt,
+                           type = "raw")
+# Evaluación
+conf_mat_rf <- caret::confusionMatrix(factor(predicciones_rf, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_rf
+
+
+stats_class_rf <- data.frame(model         = "RF",
+   precision = conf_mat_rf$overall["Accuracy"],
+  FN = conf_mat_rf$table[2,1],
+  FP = conf_mat_rf$table[1,2],
+  error.rate = 1 - conf_mat_rf$overall["Accuracy"],
+  kappa = conf_mat_rf$overall["Kappa"],
+  sensibilidad = mean(conf_mat_rf$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_rf$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_rf$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_rf$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_rf$byClass[,"F1"])
+)
+stats_class_rf
+```
+
+## Modelo Logistic regression (LR)
+
+Generamos el modelo LR.
+
+```{r}
+
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+hiperparametros <- data.frame(parameter = "none")
+
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_lrqda <- caret::train(BH.staging ~ ., data = data_tn,
+                      method = "qda",
+                      tuneGrid = hiperparametros,
+                      metric = "Accuracy",
+                      trControl = control_train,
+                      family = "binomial")
+modelo_lrqda
+
+
+summary(modelo_lrqda$finalModel)
+```
+
+```{r, cache=TRUE}
+
+# Predicciones
+predicciones_lrqda <- predict(modelo_lrqda, newdata = data_tt,
+                              type = "raw")
+
+# Evaluación
+conf_mat_lrqda <- caret::confusionMatrix(factor(predicciones_rf, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_lrqda
+
+
+stats_class_lrqda <- data.frame(model         = "lrqda",
+   precision = conf_mat_lrqda$overall["Accuracy"],
+  FN = conf_mat_lrqda$table[2,1],
+  FP = conf_mat_lrqda$table[1,2],
+  error.rate = 1 - conf_mat_lrqda$overall["Accuracy"],
+  kappa = conf_mat_lrqda$overall["Kappa"],
+  sensibilidad = mean(conf_mat_lrqda$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_lrqda$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_lrqda$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_lrqda$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_lrqda$byClass[,"F1"])
+)
+
+stats_class_lrqda
+```
+
+## Modelo Penalized Multinomial Logistic Regression (PMLR)
+
+Generamos el modelo PMLR.
+
+```{r, cache=TRUE}
+# Número de particiones y repeticiones
+particiones  <- 10
+repeticiones <- 10
+
+# hiperparametros <- data.frame(decay  = c(0.01,0.1,0.3,0.5))
+
+
+hiperparametros <- data.frame(decay  = seq(20, 30, length.out=20))
+
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (particiones * repeticiones) + 1)
+for (i in 1:(particiones * repeticiones)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros)) 
+}
+seeds[[(particiones * repeticiones) + 1]] <- sample.int(1000, 1)
+
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control_train <- trainControl(method = "repeatedcv", number = particiones,
+                              repeats = repeticiones, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+modelo_lrmulti <- caret::train(BH.staging ~ ., data = data_tn,
+                        method = "multinom",
+                        tuneGrid = hiperparametros,
+                        metric = "Accuracy",
+                        trControl = control_train,
+                        trace = FALSE)
+modelo_lrmulti
+
+
+summary(modelo_lrmulti$finalModel)
+```
+
+```{r, cache=TRUE}
+
+# REPRESENTACIÓN GRÁFICA
+ggplot(modelo_lrmulti, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo LRmulti") +
+  theme_bw()
+
+
+# Predicciones
+predicciones_lrmulti <- predict(modelo_lrmulti, newdata = data_tt,
+                                type = "raw")
+
+# Evaluación
+conf_mat_lrmulti <- caret::confusionMatrix(factor(predicciones_rf, levels = levels(factor(data_tt$BH.staging))),
+  factor(data_tt$BH.staging, levels = levels(factor(data_tt$BH.staging)))
+)
+conf_mat_lrmulti
+
+
+stats_class_lrmulti <- data.frame(model         = "LRmulti",
+   precision = conf_mat_lrmulti$overall["Accuracy"],
+  FN = conf_mat_lrmulti$table[2,1],
+  FP = conf_mat_lrmulti$table[1,2],
+  error.rate = 1 - conf_mat_lrmulti$overall["Accuracy"],
+  kappa = conf_mat_lrmulti$overall["Kappa"],
+  sensibilidad = mean(conf_mat_lrmulti$byClass[,"Sensitivity"]),
+  especificidad = mean(conf_mat_lrmulti$byClass[,"Specificity"]),
+  precisión = mean(conf_mat_lrmulti$byClass[,"Pos Pred Value"]),
+  recuperación = mean(conf_mat_lrmulti$byClass[,"Recall"]),
+  f.medida = mean(conf_mat_lrmulti$byClass[,"F1"])
+)
+
+stats_class_lrmulti
+```
+
+## Modelo de Sequential Feature Generator (SFG)
+
+```{r}
+library(keras)
+library(mlr)
+
+data_tn2 <- data_train
+
+# Crear variables one-hot para la variable de salida
+data_tn2$BH.staging.1 <- as.integer(data_tn2$BH.staging == "F1")
+data_tn2$BH.staging.2 <- as.integer(data_tn2$BH.staging == "F2")
+data_tn2$BH.staging.3 <- as.integer(data_tn2$BH.staging == "F3")
+data_tn2$BH.staging.4 <- as.integer(data_tn2$BH.staging == "F4")
+
+data_tn2 <- data_tn2 %>% 
+  select(-BH.staging)
+
+# Convertir a matriz y variables one-hot
+nc <- ncol(data_tn2)
+x_train <- as.matrix(data_tn2[, 1:nc])
+y_train <- as.matrix(data_tn2[, c("BH.staging.1", "BH.staging.2", "BH.staging.3", "BH.staging.4")])
+
+
+# Crear modelo secuencial
+modelo_sfg <- keras_model_sequential() %>%
+  layer_dense(units = 128, activation = "relu", input_shape = nc) %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 32, activation = "relu") %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 16, activation = "relu") %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 4, activation = "softmax")
+
+# Compilar modelo
+#learning_rate <- c(0.001, 0.01, 0.1)
+learning_rate <- 0.01
+
+modelo_sfg %>% compile(
+  optimizer = optimizer_adam(learning_rate),
+  loss = "categorical_crossentropy",
+  metrics = "accuracy"
+)
+
+  # Entrenar el modelo
+history <- modelo_sfg %>% fit(
+  x = x_train,
+  y = y_train,
+  epochs = 100,
+  batch_size = 32,
+  validation_split = 0.2,
+  verbose = 0
+)
+summary(modelo_sfg)
+```
+
+
+```{r}
+data_tt2 <- data_test
+
+# Crear variables one-hot para la variable de salida
+data_tt2$BH.staging.1 <- as.integer(data_tt2$BH.staging == "F1")
+data_tt2$BH.staging.2 <- as.integer(data_tt2$BH.staging == "F2")
+data_tt2$BH.staging.3 <- as.integer(data_tt2$BH.staging == "F3")
+data_tt2$BH.staging.4 <- as.integer(data_tt2$BH.staging == "F4")
+
+data_tt2 <- data_tt2 %>% 
+  select(-BH.staging)
+
+x_test <- as.matrix(data_tt2[, 1:nc])
+
+predicciones_sfg_prob <- predict(modelo_sfg, x_test)
+predicciones_sfg <- max.col(predicciones_sfg_prob)
+
+# Convertir predicciones a valores originales de BH.staging
+predicciones_sfg <- factor(ifelse(predicciones_sfg == 1, "F1",
+                                  ifelse(predicciones_sfg == 2, "F2",
+                                         ifelse(predicciones_sfg == 3, "F3", "F4"))),
+                           levels = c("F1", "F2", "F3", "F4"))
+
+conf_mat_sfg <- caret::confusionMatrix(predicciones_sfg, factor(data_test$BH.staging, levels = c("F1", "F2", "F3", "F4")))
+conf_mat_sfg
+
+
+```
+
+```{r}
+stats_class_sfg <- data.frame(model = "SFG",
+                              precision = conf_mat_sfg$overall["Accuracy"],
+                              FN = conf_mat_sfg$table[2,1],
+                              FP = conf_mat_sfg$table[1,2],
+                              error.rate = 1 - conf_mat_sfg$overall["Accuracy"],
+                              kappa = conf_mat_sfg$overall["Kappa"],
+                              sensibilidad = mean(conf_mat_sfg$byClass[, "Sensitivity"]),
+                              especificidad = mean(conf_mat_sfg$byClass[, "Specificity"]),
+                              precisión = mean(conf_mat_sfg$byClass[, "Pos Pred Value"]),
+                              recuperación = mean(conf_mat_sfg$byClass[, "Recall"]),
+                              f.medida = mean(conf_mat_sfg$byClass[, "F1"])
+)
+stats_class_sfg
+```
+
+
+## Rendimiento de los modelos:
+
+```{r}
+# Tabla resumen del rendimiento de los diferentes modelos:
+stats_resumen <- rbind(stats_class_knn, 
+                      stats_class_nb, 
+                      stats_class_mlp,
+                      stats_class_svmlineal,
+                      stats_class_svmPoly,
+                      stats_class_svmRadial,
+                      stats_class_C5.0Tree,
+                      stats_class_C5.0,
+                      stats_class_J48,
+                      stats_class_rf,
+                      stats_class_lrqda,
+                      stats_class_lrmulti,
+                      stats_class_sfg)
+
+# Ordenamos la tabla por la precisión y lo guardamos
+stats_models_prec <- stats_resumen %>% arrange(desc(precision))
+
+knitr::kable(stats_models_prec, digits = 3, caption = "Métricas del rendimiento de los modelos de aprendizaje automático.")
+
+```
