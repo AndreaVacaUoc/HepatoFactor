@@ -23,7 +23,7 @@ library(tensorflow)
 #setwd("D:/DRIVE UNIVERSIDAD/UOC/Sem4/Revisión/HepatoFactor")
 
 # Data and machine learning model
-modelo_sfg <- keras::load_model_hdf5("data/modelo_sfg.h5")
+modelo_sfg <- keras::load_model_hdf5("data/modelo_seq.h5")
 
 
 #Datos
@@ -1353,3 +1353,4 @@ server <- function(input, output) {
 ## Opcion 1
 shinyApp(ui = ui, server = server)
 
+## santigberruga. Predict-Liver-Disease [código fuente]. Madrid (Madrid/Comunidad de Madrid, España): GitHub; 2022. Disponible en: https://github.com/santigberruga/Predict-Liver-Disease. Accedido en: 05/05/2023.
