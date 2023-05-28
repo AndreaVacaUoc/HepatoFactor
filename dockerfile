@@ -1,4 +1,4 @@
-FROM rocker/r-ver:4.2.3
+FROM rocker/r-ver:4.1.0
 
 RUN R -e "install.packages(c('reticulate', 'shinyjs', 'h5py', 'shiny', 'shinydashboard', 'shinyFeedback', 'shinyalert', 'caret', 'recipes', 'dplyr', 'ggplot2', 'plotly', 'rlang', 'waiter', 'keras', 'tensorflow'))"
 
