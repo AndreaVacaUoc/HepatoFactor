@@ -47,18 +47,6 @@ normalizar <- function(data, min_vals, max_vals) {
 # Required variables to make a prediction:
 variables <- c("Id","Age","Gender","WBC", "RBC", "Plat", "AST.1", "ALT.1", "RNA.Base")
 
-
-# Render report function:
-render_report <- function(input, output, params) {
-  rmarkdown::render(input,
-                    output_file = output,
-                    params = params,
-                    envir = new.env(parent = globalenv())
-  )
-}
-
-
-
 # User Interface (UI)
 ui <- dashboardPage(
   
@@ -230,9 +218,7 @@ ui <- dashboardPage(
                     actionLink("github",   label= a(href="https://github.com/AndreaVacaUoc", 
                                                     div(icon("github"),   p("AndreaVacaUoc")), target="_blank"))
                 ),
-                HTML('<div class="CreativeCommons"><a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">
-                     <img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" />
-                     </a>This work is licensed under a<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>
+                HTML('<div</a>
                      </div>'),
     )
     
@@ -974,7 +960,7 @@ server <- function(input, output) {
   #  Report Button   #
   ####################
   
-  # Show
+    # Show
   observeEvent(input$submit, {
     req(storageData$data, prediction(), data_pred())
     
@@ -1179,14 +1165,25 @@ server <- function(input, output) {
   ############
   
   # Rmarkdown Report
+  # Render report function:
+  render_report <- function(input, output, params) {
+    rmarkdown::render(input,
+                      output_file = output,
+                      params = params,
+                      envir = new.env(parent = globalenv())
+    )
+  }
+  
+  # Download results multiple
   output$downloadReport <- downloadHandler(
     
-    filename = "Hepatic Fibrosis Degree Prediction.pdf",
+    filename = "HepatoFactor.pdf",
     
     content = function(file) {
       # Copy the report file to a temporary directory before processing it, in
       # case we don't have write permissions to the current working dir (which
       # can happen when deployed).
+      #tempReport <- tempdir()
       tempReport <- file.path(tempdir())
       my_files <- list.files("reports")
       file.copy(paste0("reports/", my_files), tempReport, overwrite = TRUE)
@@ -1206,6 +1203,7 @@ server <- function(input, output) {
                        data_pred  = data_pred())
       }
       
+      #rmarkdown::render(markdown, output_file = file, params = params)
       # Notification of rendering report
       notify <- showNotification(
         "Rendering report...",
@@ -1227,6 +1225,7 @@ server <- function(input, output) {
             # Knit the document, passing in the `params` list, and eval it in a
             # child of the global environment (this isolates the code in the document
             # from the code in this app).
+           
             callr::r(render_report,
                      list(input = markdown, output = file, params = params))
           } else {

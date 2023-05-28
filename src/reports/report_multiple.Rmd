@@ -51,7 +51,7 @@ source("graficos_web_report.R")
 
 The posible results of the prediction are *F1* (Portal fibrosis without septa), *F2* (Portal fibrosis with some septa), *F3* (Numerous septa without cirrhosis) and *F4* (Cirrhosis).
 
-The result* of the prediction with a 99% of precision is:  `r params$prediction`
+The result* of the prediction with a 72% of precision
 
 ```{r echo=FALSE}
 # Results table
@@ -101,8 +101,7 @@ The following graphs show the data used to train the predictive model and overla
 ```{r pie_plots, echo=FALSE, fig.height=4, fig.width=8}
 # Pie plots
 p1 <- plot_gender(dataset = params$data_pred) # Gender
-p2 <- plot_degree(dataset = params$data_pred)  # Degree
-final_plot <- ggarrange(p1, p2, legend = "top")
+final_plot <- ggarrange(p1, legend = "top")
 final_plot
 ```
 
