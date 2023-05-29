@@ -268,3 +268,20 @@ knitr::kable(stats_models_prec, digits = 3, caption = "Métricas del rendimiento
 
 
 ```
+
+
+Bibliografía:
+
+Keras. Sequential Model Guide. Disponible en: https://keras.io/guides/sequential_model/. Accedido el [25/04/2023].
+
+TensorFlow. Addition RNN. Disponible en: https://tensorflow.rstudio.com/examples/addition_rnn. Accedido el [25/04/2023].
+
+Chollet, F., & Allaire, J. (2018). Deep Learning with R. Manning Publications.
+
+LeCun, Y., Bengio, Y., & Hinton, G. (2012). Deep learning. Nature, 521(7553), 436-444. DOI: 10.1038/nature14539.
+
+Nasr, M., El-Bahnasy, K., Hamdy, M., & Kamal, S. M. (2017). A novel model based on non-invasive methods for prediction of liver fibrosis. En 2017 13th International Computer Engineering Conference (ICENCO) (pp. 276-281). DOI: 10.1109/ICENCO.2017.8289800.
+
+Tawazun Health. FibroScan Stiffness Results. Disponible en: https://tawazunhealth.com/fibrosscan-stiffness-results/. Accedido el [25/04/2023].
+
+
