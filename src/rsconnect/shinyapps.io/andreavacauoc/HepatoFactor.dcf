@@ -5,9 +5,9 @@ account: andreavacauoc
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 9203539
-bundleId: 7275029
+bundleId: 7303320
 url: https://andreavacauoc.shinyapps.io/HepatoFactor/
-when: 1685313877.47226
-lastSyncTime: 1685313877.47227
+when: 1685903465.78613
+lastSyncTime: 1685903465.78614
 asMultiple: FALSE
 asStatic: FALSE
