@@ -20,7 +20,7 @@ library(waiter)
 library(keras)
 library(tensorflow)
 
-#setwd("D:/DRIVE UNIVERSIDAD/UOC/Sem4/Revisión/HepatoFactor")
+#setwd("D:/")
 
 # Data and machine learning model
 modelo_sfg <- keras::load_model_hdf5("data/modelo_seq.h5")
@@ -218,7 +218,9 @@ ui <- dashboardPage(
                     actionLink("github",   label= a(href="https://github.com/AndreaVacaUoc", 
                                                     div(icon("github"),   p("AndreaVacaUoc")), target="_blank"))
                 ),
-                HTML('<div</a>
+                HTML('<div class="CreativeCommons"><a rel="license" href="https://creativecommons.org/licenses/by-nc-sa/3.0/es/" target="_blank">
+                     <img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" />
+                     </a>This work is licensed under a<a rel="license" href="https://creativecommons.org/licenses/by-nc-sa/3.0/es/" target="_blank">Esta obra está sujeta a una licencia de Reconocimiento-NoComercial-CompartirIgual 3.0 España de Creative Commons</a>
                      </div>'),
     )
     
