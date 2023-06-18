@@ -15,7 +15,10 @@ library(rlang)
 # We use this data as a base in the different plots.
 load("data/data_train.RData")
 
-
+#Function
+normalizar <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
 
 
 # We define the functions to make the different 
@@ -49,7 +52,7 @@ plot_gender <- function(dataset) {
   return(p)
 }
 
-### Pie plot Class
+### Pie plot Degree
 plot_degree <- function(dataset) {
   
   # For the categorical variable BH.staging we use pie charts to observe
@@ -70,9 +73,9 @@ plot_degree <- function(dataset) {
                              line = list(color = '#FFFFFF', width = 1)),
                showlegend = FALSE)
   p <- p %>% 
-    layout(title = "Samples by status") %>% 
+    layout(title = "Samples by Degree") %>% 
     config(displaylogo = FALSE, 
-           toImageButtonOptions = list(filename= 'Status Pie chart'))
+           toImageButtonOptions = list(filename= 'Degree Pie chart'))
   
   return(p)
 }
@@ -95,7 +98,7 @@ plot_distplot <- function(dataset, var, var_name) {
     
     p <- ggplot(data = data_train, aes(x = normalizar({{var}}), fill = BH.staging)) +
       geom_density(alpha = 0.5) +
-      scale_fill_manual(values = c("#1f77b4", "#aec7e8", "#6baed6", "#3182bd"),
+      scale_fill_manual(values = c("#DA70D655", "#98F5FF55", "#FFB5C555", "#7A67EE55"),
                         name="Legend") +
       geom_rug(data = dataset,
                alpha = 0.5,
@@ -108,7 +111,7 @@ plot_distplot <- function(dataset, var, var_name) {
                                  '</br> ID: ', Id))) +
       scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +
       ylab("Density") +
-      ggtitle(paste0("Density plots normal(", var_name,") by Status")) +
+      ggtitle(paste0("Density plots normal(", var_name,") by Degree")) +
       theme_bw() +
       theme(plot.title = element_text(hjust = 0.5))
     
@@ -116,7 +119,7 @@ plot_distplot <- function(dataset, var, var_name) {
     
     p <- ggplot(data = data_train, aes(x = {{var}}, fill = BH.staging)) +
       geom_density(alpha = 0.5) +
-      scale_fill_manual(values = c("#1f77b4", "#aec7e8", "#6baed6", "#3182bd"),
+      scale_fill_manual(values = c("#DA70D655", "#98F5FF55", "#FFB5C555", "#7A67EE55"),
                         name="Legend") +
       geom_rug(data = dataset,
                alpha = 0.5,
@@ -128,7 +131,7 @@ plot_distplot <- function(dataset, var, var_name) {
                                  '</br> ID: ', Id))) +  
       scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) + # Color plot
       ylab("Density") +
-      ggtitle(paste0("Density plots ", var_name," by status")) +
+      ggtitle(paste0("Density plots ", var_name," by Degree")) +
       theme_bw() +
       theme(plot.title = element_text(hjust = 0.5)) 
     
@@ -145,9 +148,10 @@ plot_distplot <- function(dataset, var, var_name) {
   # We edit the hover texts of the graph so that they show the information we want and 
   # configure the legend:
   
-  if (table(dataset$BH.staging)[1] != 0 & table(dataset$BH.staging)[2] != 0) {
-    
+  if (sum(table(dataset$BH.staging) > 0) == 4) {
     z <- w %>%
+      style(text = k[["x"]][["data"]][[1]][["text"]], traces = 1) %>%
+      style(text = k[["x"]][["data"]][[2]][["text"]], traces = 2) %>%
       style(text = k[["x"]][["data"]][[3]][["text"]], traces = 3) %>%
       style(text = k[["x"]][["data"]][[4]][["text"]], traces = 4)
     
@@ -167,12 +171,19 @@ plot_distplot <- function(dataset, var, var_name) {
     z[["x"]][["data"]][[4]][["legendgroup"]] <- "F4"
     z[["x"]][["data"]][[4]][["name"]] <- "F4"
     
+    z[["x"]][["data"]][[1]][["showlegend"]] <- FALSE
+    z[["x"]][["data"]][[2]][["showlegend"]] <- FALSE
     z[["x"]][["data"]][[3]][["showlegend"]] <- FALSE
     z[["x"]][["data"]][[4]][["showlegend"]] <- FALSE
     
+    
   } else {
+    
     z <- w %>%
-      style(text = k[["x"]][["data"]][[3]][["text"]], traces = 3)
+      style(text = k[["x"]][["data"]][[1]][["text"]], traces = 1) %>%
+      style(text = k[["x"]][["data"]][[2]][["text"]], traces = 2) %>%
+      style(text = k[["x"]][["data"]][[3]][["text"]], traces = 3) %>%
+      style(text = k[["x"]][["data"]][[4]][["text"]], traces = 4)
     
     # Legend title
     z[["x"]][["layout"]][["legend"]][["title"]][["text"]] <- "Legend"
@@ -184,16 +195,23 @@ plot_distplot <- function(dataset, var, var_name) {
     z[["x"]][["data"]][[2]][["legendgroup"]] <- "F2"
     z[["x"]][["data"]][[2]][["name"]] <- "F2"
     
-    z[["x"]][["data"]][[2]][["legendgroup"]] <- "F3"
-    z[["x"]][["data"]][[2]][["name"]] <- "F3"
+    z[["x"]][["data"]][[3]][["legendgroup"]] <- "F3"
+    z[["x"]][["data"]][[3]][["name"]] <- "F3"
     
-    z[["x"]][["data"]][[2]][["legendgroup"]] <- "F4"
-    z[["x"]][["data"]][[2]][["name"]] <- "F4"
+    z[["x"]][["data"]][[4]][["legendgroup"]] <- "F4"
+    z[["x"]][["data"]][[4]][["name"]] <- "F4"
     
-    z[["x"]][["data"]][[3]][["legendgroup"]] <- dataset$BH.staging
-    z[["x"]][["data"]][[3]][["name"]] <- dataset$BH.staging
     
-    z[["x"]][["data"]][[3]][["showlegend"]] <- FALSE
+    z[["x"]][["data"]][[5]][["legendgroup"]] <- dataset$BH.staging
+    z[["x"]][["data"]][[5]][["name"]] <- dataset$BH.staging
+    
+    z[["x"]][["data"]][[5]][["showlegend"]] <- FALSE
+    
+#    z[["x"]][["data"]][[1]][["showlegend"]] <- FALSE
+#    z[["x"]][["data"]][[2]][["showlegend"]] <- FALSE
+#    z[["x"]][["data"]][[3]][["showlegend"]] <- FALSE
+#    z[["x"]][["data"]][[4]][["showlegend"]] <- FALSE
+    
   }
   
   
@@ -237,7 +255,7 @@ plot_boxplot <- function(dataset, var, var_name) {
                                     '</br> ', var_name, ": ", {{var}},
                                     '</br> ', "(", var_name,")", ": ", round(normalizar({{var}}),3),
                                     '</br> ID: ', Id))) +
-      scale_fill_manual(values = c("#1f77b4", "#aec7e8", "#6baed6", "#3182bd")) +         # Samples color
+      scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +         # Samples color
       scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +    # Boxplots color
       ggtitle(paste0("Boxplots log(", var_name,") by status")) +
       theme_bw() +
@@ -255,7 +273,7 @@ plot_boxplot <- function(dataset, var, var_name) {
                                     '</br> BH.staging: ', BH.staging,
                                     '</br> ', var_name, ": ", {{var}},
                                     '</br> ID: ', Id))) +
-      scale_fill_manual(values = c("#1f77b4", "#aec7e8", "#6baed6", "#3182bd")) +      # Samples color
+      scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +      # Samples color
       scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) + # Boxplots color
       ggtitle(paste0("Boxplots ", var_name," by status")) +
       theme_bw() +
@@ -278,7 +296,7 @@ plot_boxplot <- function(dataset, var, var_name) {
   
   # Configure the legend:
   
-  if (table(dataset$BH.staging)[1] != 0 & table(dataset$BH.staging)[2] != 0) {
+  if (sum(table(dataset$BH.staging) > 0) == 4) {
     # Legend title
     z[["x"]][["layout"]][["legend"]][["title"]][["text"]] <- "Legend"
     
@@ -295,10 +313,14 @@ plot_boxplot <- function(dataset, var, var_name) {
     z[["x"]][["data"]][[4]][["legendgroup"]] <- "F4"
     z[["x"]][["data"]][[4]][["name"]] <- "F4"
     
+    z[["x"]][["data"]][[1]][["showlegend"]] <- FALSE
+    z[["x"]][["data"]][[2]][["showlegend"]] <- FALSE
     z[["x"]][["data"]][[3]][["showlegend"]] <- FALSE
     z[["x"]][["data"]][[4]][["showlegend"]] <- FALSE
     
+    
   } else {
+    
     # Legend title
     z[["x"]][["layout"]][["legend"]][["title"]][["text"]] <- "Legend"
     
@@ -315,10 +337,12 @@ plot_boxplot <- function(dataset, var, var_name) {
     z[["x"]][["data"]][[4]][["legendgroup"]] <- "F4"
     z[["x"]][["data"]][[4]][["name"]] <- "F4"
     
-    z[["x"]][["data"]][[3]][["legendgroup"]] <- dataset$BH.staging
-    z[["x"]][["data"]][[3]][["name"]] <- dataset$BH.staging
+    z[["x"]][["data"]][[5]][["legendgroup"]] <- dataset$BH.staging
+    z[["x"]][["data"]][[5]][["name"]] <- dataset$BH.staging
     
-    z[["x"]][["data"]][[3]][["showlegend"]] <- FALSE
+    z[["x"]][["data"]][[5]][["showlegend"]] <- FALSE
+    
+
     
   }
   

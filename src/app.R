@@ -7,7 +7,7 @@
 # Load packages
 library(shiny)
 library(shinydashboard)
-library(shinyjs) # we use shinyjs:: in the code
+#library(shinyjs) # we use shinyjs:: in the code
 library(shinyFeedback)
 library(shinyalert)
 library(caret)
@@ -551,7 +551,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -597,7 +597,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -669,7 +669,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -699,7 +699,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -742,7 +742,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -792,7 +792,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -823,7 +823,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -866,7 +866,7 @@ server <- function(input, output) {
         showConfirmButton = TRUE,
         showCancelButton = FALSE,
         confirmButtonText = "Ok",
-        confirmButtonCol = "#AEDEF4",
+        confirmButtonCol = "#AEDEF4FF",
         timer = 0,
         imageUrl = "",
         animation = TRUE
@@ -1154,7 +1154,7 @@ server <- function(input, output) {
     } else if (input$var3 == "BH.staging") {
       
       # Pie chart BH.staging
-      plot_class(data_pred()) 
+      plot_degree(data_pred()) 
       
     }
   })
@@ -1275,7 +1275,7 @@ server <- function(input, output) {
       showConfirmButton = TRUE,
       showCancelButton = FALSE,
       confirmButtonText = "Ok",
-      confirmButtonCol = "#AEDEF4",
+      confirmButtonCol = "#AEDEF4FF",
       timer = 0,
       imageUrl = "",
       animation = TRUE
@@ -1336,7 +1336,7 @@ server <- function(input, output) {
       showConfirmButton = TRUE,
       showCancelButton = FALSE,
       confirmButtonText = "Ok",
-      confirmButtonCol = "#AEDEF4",
+      confirmButtonCol = "#AEDEF4FF",
       timer = 0,
       imageUrl = "",
       animation = TRUE
