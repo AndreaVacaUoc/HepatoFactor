@@ -90,7 +90,7 @@ plot_distplot <- function(dataset, var, var_name) {
   
   # In the previous study of the data, we saw that some variables 
   # present an asymmetric distribution, so in those cases we use their
-  # logarithm to facilitate their visualization.
+  # norm to facilitate their visualization.
   
   # First we create the plots with ggplot2
   
@@ -257,7 +257,7 @@ plot_boxplot <- function(dataset, var, var_name) {
                                     '</br> ID: ', Id))) +
       scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +         # Samples color
       scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +    # Boxplots color
-      ggtitle(paste0("Boxplots log(", var_name,") by status")) +
+      ggtitle(paste0("Boxplots Norm(", var_name,") by Degree")) +
       theme_bw() +
       theme(plot.title = element_text(hjust = 0.5))
     
@@ -275,7 +275,7 @@ plot_boxplot <- function(dataset, var, var_name) {
                                     '</br> ID: ', Id))) +
       scale_fill_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) +      # Samples color
       scale_color_manual(values = c("orchid", "cadetblue1", "#FFB5C5", "slateblue2")) + # Boxplots color
-      ggtitle(paste0("Boxplots ", var_name," by status")) +
+      ggtitle(paste0("Boxplots ", var_name," by Degree")) +
       theme_bw() +
       theme(plot.title = element_text(hjust = 0.5))
     
